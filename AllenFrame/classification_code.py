@@ -32,6 +32,17 @@ logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 @DatasetReader.register("text_classification_txt")
 class TextClassificationTxtReader(DatasetReader):
+    """
+    文本分类任务的datasetreader,从csv获取数据,head指定text,label.如:
+    label   text
+    sad    i like it.
+    :param tokenizer: 分词器
+    :param token_indexers:词编码器
+    :param delimiter:csv分隔符
+    :param testing:是否是测试，如果True，则只读入1000条样本。
+    :param max_sequence_length:词编码后的最大长度，对过长的进行截断。
+    :param lazy:是否lazy模型。
+    """
 
     def __init__(self,
                  tokenizer: Tokenizer = None,
@@ -40,17 +51,7 @@ class TextClassificationTxtReader(DatasetReader):
                  testing: bool = False,
                  max_sequence_length: int = None,
                  lazy: bool = False) -> None:
-        """
-        文本分类任务的datasetreader,从csv获取数据,head指定text,label.如:
-        label   text
-        sad    i like it.
-        :param tokenizer: 分词器
-        :param token_indexers:
-        :param delimiter:
-        :param testing:
-        :param max_sequence_length:
-        :param lazy:
-        """
+
         super().__init__(lazy)
         self._tokenizer = tokenizer or WordTokenizer()
         self._token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()}
@@ -121,11 +122,9 @@ class JIEBASplitter(WordSplitter):
                  user_dict: str = None,
                  stop_words_path: str = None) -> None:
         self._pos_tags = pos_tags  # 是否标注词性。
-
         if user_dict and os.path.exists(user_dict):
             jieba.load_userdict(user_dict)
         self._only_tokens = only_tokens  # 最终是否只保留字符，去掉词性等属性
-
         self._stop_words = None  # 停用词
         if stop_words_path:
             self._stop_words = set()
