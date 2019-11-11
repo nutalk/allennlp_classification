@@ -7,25 +7,36 @@
 ```sh
 allennlp_classification
 ├── AllenFrame
-│   └── classification_code.py
+│   ├── data.py
+│   ├── model.py
+│   └── moduls.py
 ├── data
 │   ├── test.csv
 │   └── train.csv
-├── model_bert.json
-├── model_cnn.json
-├── model_lstm.json
-├── predict.sh
+├── examples
+│   ├── model_bert.json
+│   ├── model_albert.json
+│   ├── model_cnn.json
+│   └── model_lstm.json
 ├── pre_train
-│   ├── chinese_wwm_ext_pytorch.tar.gz
-│   └── vocab.txt
+│   ├── bert
+│   │   ├── chinese_wwm_ext_pytorch.tar.gz
+│   │   └── vocab.txt
+│   ├── albert
+│   │   ├── bert_config.json
+│   │   ├── pytorch_model.bin
+│   │   └── vocab.txt
 ├── README.md
 └── train.sh
 ```
 
-data中是训练语料的存储范例。三个json文件对应三个模型的配置文件。pre_train里面两个文件只是范例，你需要自己重写下载后替换。AllenFrame目录下是定义的相关类。
+data中是训练语料的存储范例。
+examples里面的json文件对应模型的配置文件。
+pre_train是Bert、Robert以及Albert的预训练模型，你需要自己重写下载后替换。
+AllenFrame目录下是定义和修改后的相关类。
 
 ## 项目运行
 1. clone本项目到本地
 1. 安装Allennlp
 1. 准备自己的训练语料
-1. 修改train.sh，运行train.sh
+1. 修改并运行./examples/train.sh

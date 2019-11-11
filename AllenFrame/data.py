@@ -1,4 +1,6 @@
 import logging
+
+import spacy
 from allennlp.common.file_utils import cached_path
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.fields import Field, TextField, LabelField
@@ -11,38 +13,19 @@ from typing import *
 from allennlp.data.tokenizers.word_splitter import WordSplitter
 import os
 
-from allennlp.nn.util import get_text_field_mask
 from allennlp.data.tokenizers import Token
 import csv
-from allennlp.models import BasicClassifier, Model
-from allennlp.training.metrics.fbeta_measure import FBetaMeasure
 
-from typing import Dict, Optional
+from typing import Dict
 
 from overrides import overrides
-import torch
-
-from allennlp.data import Vocabulary
-from allennlp.models.model import Model
-from allennlp.modules import Seq2SeqEncoder, Seq2VecEncoder, TextFieldEmbedder
-from allennlp.nn import InitializerApplicator, RegularizerApplicator
+from pytorch_pretrained_bert import BertTokenizer
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
 @DatasetReader.register("text_classification_txt")
 class TextClassificationTxtReader(DatasetReader):
-    """
-    文本分类任务的datasetreader,从csv获取数据,head指定text,label.如:
-    label   text
-    sad    i like it.
-    :param tokenizer: 分词器
-    :param token_indexers:词编码器
-    :param delimiter:csv分隔符
-    :param testing:是否是测试，如果True，则只读入1000条样本。
-    :param max_sequence_length:词编码后的最大长度，对过长的进行截断。
-    :param lazy:是否lazy模型。
-    """
 
     def __init__(self,
                  tokenizer: Tokenizer = None,
@@ -51,7 +34,17 @@ class TextClassificationTxtReader(DatasetReader):
                  testing: bool = False,
                  max_sequence_length: int = None,
                  lazy: bool = False) -> None:
-
+        """
+        文本分类任务的datasetreader,从csv获取数据,head指定text,label.如:
+        label   text
+        sad    i like it.
+        :param tokenizer: 分词器
+        :param token_indexers:
+        :param delimiter:
+        :param testing:
+        :param max_sequence_length:
+        :param lazy:
+        """
         super().__init__(lazy)
         self._tokenizer = tokenizer or WordTokenizer()
         self._token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()}
@@ -70,7 +63,10 @@ class TextClassificationTxtReader(DatasetReader):
                 counter += 1
                 if self.testing and counter > 1000:
                     break
-                yield self.text_to_instance(str(row['text']), str(row['label']))
+                title = str(row.get('title', ''))
+                body = str(row.get('body', ''))
+                text = title + '。' + body + str(row.get('text', ''))
+                yield self.text_to_instance(text, str(row['label']))
 
     def _truncate(self, tokens):
         """
@@ -121,10 +117,13 @@ class JIEBASplitter(WordSplitter):
                  only_tokens: bool = True,
                  user_dict: str = None,
                  stop_words_path: str = None) -> None:
+        jieba.enable_parallel(4)
         self._pos_tags = pos_tags  # 是否标注词性。
+
         if user_dict and os.path.exists(user_dict):
             jieba.load_userdict(user_dict)
         self._only_tokens = only_tokens  # 最终是否只保留字符，去掉词性等属性
+
         self._stop_words = None  # 停用词
         if stop_words_path:
             self._stop_words = set()
@@ -180,58 +179,3 @@ class JIEBASplitter(WordSplitter):
             return self._sanitize(poss.cut(sentence))
         else:
             return self._sanitize(jieba.cut(sentence))
-
-
-@Model.register("basic_classifier_f1")
-class BasicClassifierF1(BasicClassifier):
-    """
-    在原有分类模型的基础上,增加fscore的判断.
-    """
-    def __init__(self,
-                 vocab: Vocabulary,
-                 text_field_embedder: TextFieldEmbedder,
-                 seq2vec_encoder: Seq2VecEncoder,
-                 seq2seq_encoder: Seq2SeqEncoder = None,
-                 dropout: float = None,
-                 num_labels: int = None,
-                 label_namespace: str = "labels",
-                 initializer: InitializerApplicator = InitializerApplicator(),
-                 regularizer: Optional[RegularizerApplicator] = None) -> None:
-        super().__init__(vocab, text_field_embedder, seq2vec_encoder,
-                         seq2seq_encoder, dropout, num_labels, label_namespace, initializer, regularizer)
-        self._f1_measure = FBetaMeasure(average='micro')
-
-    def forward(self,  # type: ignore
-                tokens: Dict[str, torch.LongTensor],
-                label: torch.IntTensor = None) -> Dict[str, torch.Tensor]:
-        embedded_text = self._text_field_embedder(tokens)
-        mask = get_text_field_mask(tokens).float()
-
-        if self._seq2seq_encoder:
-            embedded_text = self._seq2seq_encoder(embedded_text, mask=mask)
-
-        embedded_text = self._seq2vec_encoder(embedded_text, mask=mask)
-
-        if self._dropout:
-            embedded_text = self._dropout(embedded_text)
-
-        logits = self._classification_layer(embedded_text)
-        probs = torch.nn.functional.softmax(logits, dim=-1)
-
-        output_dict = {"logits": logits, "probs": probs}
-
-        if label is not None:
-            loss = self._loss(logits, label.long().view(-1))
-            output_dict["loss"] = loss
-            self._accuracy(logits, label)
-            self._f1_measure(logits, label)
-
-        return output_dict
-
-    def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        f1_dict = self._f1_measure.get_metric(reset)
-        return {'accuracy': self._accuracy.get_metric(reset=reset),
-                'precision': f1_dict['precision'],
-                'recall': f1_dict['recall'],
-                'fscore': f1_dict['fscore']}
-
