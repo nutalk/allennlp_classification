@@ -1,5 +1,5 @@
-local bert_model = "./pre_train/vocab.txt";
-local bert_archive = "./pre_train/chinese_wwm_ext_pytorch.tar.gz";
+local bert_model = "/home/hetao/Data/pre_train/chinese_roberta_wwm_ext_pytorch/vocab.txt";
+local bert_archive = "/home/hetao/Data/pre_train/chinese_roberta_wwm_ext_pytorch/chinese_roberta_wwm_ext_pytorch.tar.gz";
 
 {
     "dataset_reader": {
@@ -22,7 +22,7 @@ local bert_archive = "./pre_train/chinese_wwm_ext_pytorch.tar.gz";
     "train_data_path": "./data/train.csv",
     "validation_data_path": "./data/test.csv",
     "model": {
-        "type": "basic_classifier_f1",
+        "type": "text_classifier_fscore_focal_loss",
         "text_field_embedder": {
             "allow_unmatched_keys": true,
             "embedder_to_indexer_map": {
@@ -32,7 +32,7 @@ local bert_archive = "./pre_train/chinese_wwm_ext_pytorch.tar.gz";
                 "bert": {
                     "type": "bert-pretrained",
                     "pretrained_model": bert_archive,
-                    "top_layer_only": true,
+                    "top_layer_only": false,
                     "requires_grad": false
                 }
             }
@@ -41,8 +41,10 @@ local bert_archive = "./pre_train/chinese_wwm_ext_pytorch.tar.gz";
            "type": "bert_pooler",
            "pretrained_model": bert_archive,
            "requires_grad": false
-        }
-    },
+        },
+        "dropout": 0.25,
+        "loss":"cross_entropy_loss"
+},
     "iterator": {
         "type": "bucket",
         "sorting_keys": [["tokens", "num_tokens"]],

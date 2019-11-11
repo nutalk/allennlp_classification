@@ -1,3 +1,3 @@
-allennlp train model_cnn.json \
-  -s /path/for/model/and/log \
-   --include-package AllenFrame.classification_code
+allennlp train examples/model_albert.json \
+  -s /home/hetao/Data/AllenNlpModel/test_double \
+   --include-package AllenFrame

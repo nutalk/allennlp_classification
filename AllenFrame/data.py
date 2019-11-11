@@ -1,6 +1,4 @@
 import logging
-
-import spacy
 from allennlp.common.file_utils import cached_path
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.fields import Field, TextField, LabelField
@@ -19,7 +17,6 @@ import csv
 from typing import Dict
 
 from overrides import overrides
-from pytorch_pretrained_bert import BertTokenizer
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 

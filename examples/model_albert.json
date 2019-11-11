@@ -1,0 +1,46 @@
+{
+    "dataset_reader": {
+        "lazy": false,
+        "type": "text_classification_txt",
+        "tokenizer": {
+          "type":"albert-basic",
+          "vocab_path": "/home/hetao/Data/pre_train/albert_tiny_48/vocab.txt",
+        "config_path": "/home/hetao/Data/pre_train/albert_tiny_48/bert_config.json",
+        "model_path": "/home/hetao/Data/pre_train/albert_tiny_48/pytorch_model.bin"
+        },
+        "token_indexers": {
+          "bert":{
+            "type":"albert-pretrained",
+            "pretrained_model": "/home/hetao/Data/pre_train/albert_tiny_48/vocab.txt"
+            }
+        },
+        "testing": false
+},
+    "train_data_path": "/home/hetao/Data/AllenNlpModel/Data/text_style/is_add/fine_tune/train.csv",
+    "validation_data_path": "/home/hetao/Data/AllenNlpModel/Data/text_style/is_add/fine_tune/valid.csv",
+    "model": {
+        "type": "text_classifier_albert",
+        "vocab_path": "/home/hetao/Data/pre_train/albert_tiny_48/vocab.txt",
+        "config_path": "/home/hetao/Data/pre_train/albert_tiny_48/bert_config.json",
+        "model_path": "/home/hetao/Data/pre_train/albert_tiny_48/pytorch_model.bin",
+        "dropout": 0.25,
+        "loss":"cross_entropy_loss"
+},
+    "iterator": {
+        "type": "bucket",
+        "sorting_keys": [["tokens", "num_tokens"]],
+        "batch_size": 8
+    },
+    "trainer": {
+        "optimizer": {
+            "type": "adam",
+            "lr": 0.001
+        },
+        "validation_metric": "+1_fscore",
+        "num_serialized_models_to_keep": 1,
+        "num_epochs": 50,
+        "grad_norm": 10.0,
+        "patience": 10,
+        "cuda_device": 0
+    }
+}

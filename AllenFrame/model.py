@@ -16,6 +16,8 @@ from allennlp.data import Vocabulary
 from allennlp.models.model import Model
 from allennlp.modules import Seq2SeqEncoder, Seq2VecEncoder, TextFieldEmbedder, FeedForward
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
+from AllenFrame.albert.modeling_albert import AlbertPreTrainedModel
+from AllenFrame.albert.albert_total import get_albert_total
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -92,6 +94,116 @@ class BasicClassifierF1(Model):
 
         if self._dropout:
             embedded_text = self._dropout(embedded_text)
+
+        logits = self._classification_layer(embedded_text)
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+
+        output_dict = {"logits": logits, "probs": probs}
+
+        if label is not None:
+            loss = self._loss(logits, label.long().view(-1))
+            output_dict["loss"] = loss
+            self._accuracy(logits, label)
+            self._f1_measure(logits, label)
+
+        return output_dict
+
+    @overrides
+    def decode(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Does a simple argmax over the probabilities, converts index to string label, and
+        add ``"label"`` key to the dictionary with the result.
+        """
+        predictions = output_dict["probs"]
+        if predictions.dim() == 2:
+            predictions_list = [predictions[i] for i in range(predictions.shape[0])]
+        else:
+            predictions_list = [predictions]
+        classes = []
+        for prediction in predictions_list:
+            label_idx = prediction.argmax(dim=-1).item()
+            label_str = self.vocab.get_index_to_token_vocabulary(self._label_namespace).get(
+                label_idx, str(label_idx)
+            )
+            classes.append(label_str)
+        output_dict["label"] = classes
+        return output_dict
+
+    def get_metrics(self, reset: bool = False) -> Dict[str, float]:
+        f1_dict = self._f1_measure.get_metric(reset)
+        output = {}
+        output['accuracy'] = self._accuracy.get_metric(reset=reset)
+        counter = 0
+        for precision, recall, fscore in zip(f1_dict['precision'], f1_dict['recall'], f1_dict['fscore']):
+            output[str(counter) + '_precision'] = precision
+            output[str(counter) + '_recall'] = recall
+            output[str(counter) + '_fscore'] = fscore
+            counter += 1
+        return output
+
+
+@Model.register("text_classifier_albert")
+class AlbertClassifierF1(Model):
+    """
+    文本分类模型。
+    """
+
+    def __init__(
+            self,
+            vocab: Vocabulary,
+            vocab_path:str=None,
+            config_path:str=None,
+            model_path:str = None,
+            dropout: float = None,
+            label_namespace: str = "labels",
+            num_labels: int = None,
+            loss: str = None,  # focal_loss
+            initializer: InitializerApplicator = InitializerApplicator(),
+            regularizer: Optional[RegularizerApplicator] = None,
+    ) -> None:
+
+        super().__init__(vocab, regularizer)
+        config, tokenizer, model = get_albert_total(config_path, vocab_path, model_path)
+
+        self._bert = model
+
+        if dropout:
+            self._dropout = torch.nn.Dropout(dropout)
+        else:
+            self._dropout = None
+        self._label_namespace = label_namespace
+
+        if num_labels:
+            self._num_labels = num_labels
+        else:
+            self._num_labels = vocab.get_vocab_size(namespace=self._label_namespace)
+
+        self._classification_layer = torch.nn.Linear(config.hidden_size, config.num_labels)
+
+        self._accuracy = CategoricalAccuracy()
+        if loss is None:
+            self._loss = torch.nn.CrossEntropyLoss()
+        elif loss == 'focal_loss':
+            self._loss = FocalLoss(alpha=0.25, num_classes=self._num_labels)  # focal loss
+        elif loss == 'cross_entropy_loss':
+            self._loss = torch.nn.CrossEntropyLoss()
+        else:
+            raise ValueError('wrong loss type')
+        self._f1_measure = FBetaMeasure()
+        initializer(self)
+
+    def forward(self,  # type: ignore
+                tokens: Dict[str, torch.LongTensor],
+                label: torch.IntTensor = None) -> Dict[str, torch.Tensor]:
+        # print(tokens)
+
+        outputs = self._bert(tokens['bert'],
+                            attention_mask=None,
+                            token_type_ids=None,
+                            position_ids=None,
+                            head_mask=None)
+        if self._dropout:
+            embedded_text = self._dropout(outputs[1])
 
         logits = self._classification_layer(embedded_text)
         probs = torch.nn.functional.softmax(logits, dim=-1)
