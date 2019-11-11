@@ -40,3 +40,6 @@ AllenFrame目录下是定义和修改后的相关类。
 1. 安装Allennlp
 1. 准备自己的训练语料
 1. 修改并运行./examples/train.sh
+
+## TODO
+1. 增加albert模型，目前的albert模型有问题，训练过程不收敛。
